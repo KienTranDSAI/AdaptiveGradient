@@ -1,6 +1,6 @@
 import torch
 import numpy as np
-from AdaptiveExplainer import AdaptiveExplainer
+from AdaptiveGradient._AdaptiveExplainer import AdaptiveExplainer
 import shap
 import matplotlib.pyplot as plt
 from mask import *
@@ -88,8 +88,8 @@ def draw_important_point(inp_img, point):
   plt.imshow(inp_img.squeeze())
   plt.scatter(point[:,1], point[:,0],color='red', marker='o', s = 2)
   plt.show()
-def run_pipeline_explain(to_explain, baseline, percentile, local_smoothing = 0, numBaseline = 3, get_early_epoch = False):
-  shap_val, grads_temp, index_names = explain_img(to_explain, baseline, local_smoothing = local_smoothing, numBaseline = numBaseline)
+def run_pipeline_explain(to_explain, model, baseline, percentile, local_smoothing = 0, numBaseline = 3, get_early_epoch = False):
+  shap_val, grads_temp, index_names = explain_img(to_explain, model, baseline, local_smoothing = local_smoothing, numBaseline = numBaseline)
   import_val = get_important_val(grads_temp, get_early_epoch= get_early_epoch)
   point = get_important_point(import_val, percentile)
   draw_important_point(to_explain, point)
