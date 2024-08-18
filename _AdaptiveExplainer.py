@@ -3,7 +3,8 @@ import warnings
 import numpy as np
 import pandas as pd
 from packaging import version
-import torch
+
+
 class AdaptiveExplainer():
 
     def __init__(self, model, data, batch_size=50, local_smoothing=0):
@@ -27,26 +28,38 @@ class AdaptiveExplainer():
         self.batch_size = batch_size
         self.local_smoothing = local_smoothing
 
+       
         self.data = data
         self.model = model.eval()
 
+        multi_output = False
+        outputs = self.model(*self.model_inputs)
+        if len(outputs.shape) > 1 and outputs.shape[1] > 1:
+            multi_output = True
+        self.multi_output = multi_output
 
-        self.gradients = [None]
+        if not self.multi_output:
+            self.gradients = [None]
+        else:
+            self.gradients = [None for _ in range(outputs.shape[1])]
+
     def gradient(self, idx, inputs):
-        
+        import torch
         self.model.zero_grad()
         X = [x.requires_grad_() for x in inputs]
         outputs = self.model(*X)
         selected = [val for val in outputs[:, idx]]
+        
         grads = [torch.autograd.grad(selected, x,
                                          retain_graph=True if idx + 1 < len(X) else None)[0].cpu().numpy()
                      for idx, x in enumerate(X)]
         return grads
-        
 
+    
 
     def shap_values(self, X, nsamples=200, ranked_outputs=None, output_rank_order="max", rseed=None, return_variances=False, numBaseline = 3):
 
+        import torch
         # X ~ self.model_input
         # X_data ~ self.data
 
@@ -57,9 +70,28 @@ class AdaptiveExplainer():
         else:
             assert isinstance(X, list), "Expected a list of model inputs!"
 
-        model_output_ranks = (torch.ones((X[0].shape[0], len(self.gradients))).int() *
+        if ranked_outputs is not None and self.multi_output:
+            with torch.no_grad():
+                model_output_values = self.model(*X)
+            # rank and determine the model outputs that we will explain
+            if output_rank_order == "max":
+                _, model_output_ranks = torch.sort(model_output_values, descending=True)
+            elif output_rank_order == "min":
+                _, model_output_ranks = torch.sort(model_output_values, descending=False)
+            elif output_rank_order == "max_abs":
+                _, model_output_ranks = torch.sort(torch.abs(model_output_values), descending=True)
+            else:
+                emsg = "output_rank_order must be max, min, or max_abs!"
+                raise ValueError(emsg)
+            model_output_ranks = model_output_ranks[:, :ranked_outputs]
+        else:
+            model_output_ranks = (torch.ones((X[0].shape[0], len(self.gradients))).int() *
                                   torch.arange(0, len(self.gradients)).int())
+        # print(f"model_output_ranks is {model_output_ranks}")
+        # self.expected_value = model_output_values.mean(axis=(i for i in range(len(model_output_values.shape) - 1)))
 
+        
+       
         # compute the attributions
         X_batches = X[0].shape[0]
         # print(f"X_batches is: {X_batches}")
@@ -110,18 +142,28 @@ class AdaptiveExplainer():
                                 x = X[a][j].clone().detach()
                             samples_input[a][k] = (t * x + (1 - t) * (self.model_inputs[a][rind]).clone().detach()).\
                                 clone().detach()
-                            # if self.input_handle is None:
-                            #     samples_delta[a][k] = (x - (self.data[a][rind]).clone().detach()).cpu().numpy()
+                            
                             samples_delta[a][k] = (x - (self.data[a][rind]).clone().detach()).cpu().numpy()
+
+                        
                     # compute the gradients at all the sample points
                     find = model_output_ranks[j, i]
                     grads = []
                     for b in range(0, nsamples, self.batch_size):   #Tính gradient theo batch
                         batch = [samples_input[c][b:min(b+self.batch_size,nsamples)].clone().detach() for c in range(len(X))]
                         grads.append(self.gradient(find, batch))
+                    # print(f"Len of grads is {len(grads)}")
+                    # print(f"Shape of grads: {len(grads[0])}")
+                    # print(f"Shape of grads[0][0]: {grads[0][0].shape}")
                     grad = [np.concatenate([g[z] for g in grads], 0) for z in range(len(self.data))]  #Len of grad 1, shape of grad[0]: (50, 3, 224, 224)
+                    # print(f"Len of grad {len(grad)}, shape of grad[0]: {grad[0].shape}")
+                    # assign the attributions to the right part of the output arrays
+                    # print(f"len of sample_delta: {len(samples_delta)}, shape is: {samples_delta[0].shape}")
+                    # print(f"Len of self.data: {len(self.data)}")
                     for t in range(len(self.data)):
                         samples = grad[t] * samples_delta[t]    #len of sample_delta: 1, shape is: (50, 3, 224, 224)
+                        # print(f"samples shape is {samples.shape}")
+                        # phis[t][j] = samples.mean(0)
                         phis[t][j] = samples.sum(0)
                         # temp = samples
                         phi_vars[t][j] = samples.var(0) / np.sqrt(samples.shape[0]) # estimate variance of means
@@ -129,9 +171,13 @@ class AdaptiveExplainer():
                         all_phis_vars += phi_vars[t][j]
                         grad_temp += samples
             
+            # print(f"Len of output_phis: {len(output_phis)}")
+            # output_phis.append(phis[0] if len(self.data) == 1 else phis)
+            # output_phi_vars.append(phi_vars[0] if not self.multi_input else phi_vars)
             output_phis.append(all_phis[0] if len(self.data) == 1 else all_phis)
             output_phi_vars.append(all_phis_vars[0] if not self.multi_input else all_phis_vars)
 
+ 
 
         if isinstance(output_phis, list):
             # in this case we have multiple inputs and potentially multiple outputs
