@@ -11,6 +11,7 @@ def normalize(image, mean = None, std = None):
     if std == None:
        std = [0.229, 0.224, 0.225]
     if image.max() > 1:
+        image = image.astype(np.float64)
         image /= 255
     image = (image - mean) / std
     # in addition, roll the axis so that they suit pytorch
