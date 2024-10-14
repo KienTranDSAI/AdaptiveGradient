@@ -81,3 +81,27 @@ def create_customed_image(val,standard_threshold, mask = np.zeros((224,224,3))):
 def get_cost_matrix(source, target):
     cost_matrix = pairwise_distances(source, target, metric = 'euclidean')
     return cost_matrix
+
+def calculate_ot_loss(border_image, first_image, second_image):
+    non_zero_border_image = border_image[border_image != 0]
+    non_zero_border_image_ind = np.where(border_image != 0)
+    border_coords = list(zip(non_zero_border_image_ind[0], non_zero_border_image_ind[1]))
+
+    non_zero_first_image = first_image[first_image != 0]
+    non_zero_first_image_ind = np.where(first_image != 0)
+    first_coords = list(zip(non_zero_first_image_ind[0], non_zero_first_image_ind[1]))
+
+    non_zero_second_image = second_image[second_image != 0]
+    non_zero_second_image_ind = np.where(second_image != 0)
+    second_coords = list(zip(non_zero_second_image_ind[0], non_zero_second_image_ind[1]))
+
+    first_cost_matrix = get_cost_matrix(first_coords, border_coords)
+    second_cost_matrix = get_cost_matrix(second_coords, border_coords)
+
+    non_zero_border_image = non_zero_border_image/non_zero_border_image.sum()
+    non_zero_first_image = non_zero_first_image/non_zero_first_image.sum()
+    non_zero_second_image = non_zero_second_image/non_zero_second_image.sum()
+
+    first_ot = ot.sinkhorn2(non_zero_first_image, non_zero_border_image, first_cost_matrix, 1)
+    second_ot = ot.sinkhorn2(non_zero_second_image, non_zero_border_image, second_cost_matrix, 1)
+    return first_ot, second_ot
