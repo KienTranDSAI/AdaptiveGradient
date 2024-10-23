@@ -74,7 +74,17 @@ def get_important_val(grads_temp, get_early_epoch = False):
   val_ = np.expand_dims(val,-1)
   val_ = np.swapaxes(val_, 0, -1)
   return [val_]
-def get_important_point(important_val, percentile):
+def get_raw_important_point(important_val, percentile):
+  val = important_val
+  important_val = [np.sum(i, axis = 3) for i in val]
+  threshold = np.percentile(important_val, percentile)
+  indexes  = np.where(important_val > threshold)
+  second_dim = indexes[2]
+  third_dim = indexes[3]
+  datapoint = [[second_dim[i],third_dim[i]] for i in range(len(second_dim))]
+  datapoint = np.array(datapoint)
+  return datapoint
+def get_abs_important_point(important_val, percentile):
   val = important_val
   abs_val = [np.abs(i) for i in val]
   important_val = [np.sum(i, axis = 3) for i in abs_val]
