@@ -62,18 +62,18 @@ def get_border_mask(mask):
     return border_image
 
 def create_shap_image(shap_value, standard_threshold, mask = np.zeros((224,224,3))):
-    important_point = get_important_point([np.transpose(shap_value[0], (3,1,2,0))], standard_threshold)
+    important_point = get_raw_important_point([np.transpose(shap_value[0], (3,1,2,0))], standard_threshold)
     shap_image = np.zeros(mask.shape)[:,:,0]
     for point in important_point:
         shap_image[point[0], point[1]] = 1
 def create_aig_image(grad_temp, standard_threshold, mask = np.zeros((224,224,3))):
-    aig_important_points = get_important_point(get_important_val(grad_temp, get_early_epoch= True), standard_threshold)
+    aig_important_points = get_raw_important_point(get_important_val(grad_temp, get_early_epoch= True), standard_threshold)
     aig_image = np.zeros(mask.shape)[:,:,0]
     for point in aig_important_points:
         aig_image[point[0], point[1]] = 1
     return aig_image
 def create_customed_image(val,standard_threshold, mask = np.zeros((224,224,3))):
-    important_point = get_important_point(val, standard_threshold)
+    important_point = get_raw_important_point(val, standard_threshold)
     image = np.zeros(mask.shape)[:,:,0]
     for point in important_point:
         image[point[0], point[1]] = 1
