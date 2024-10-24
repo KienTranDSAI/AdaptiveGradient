@@ -102,6 +102,6 @@ def draw_important_point(inp_img, point):
 def run_pipeline_explain(to_explain, model, baseline, percentile, local_smoothing = 0, numBaseline = 3, get_early_epoch = False):
   shap_val, grads_temp, index_names = explain_img(to_explain, model, baseline, local_smoothing = local_smoothing, numBaseline = numBaseline)
   import_val = get_important_val(grads_temp, get_early_epoch= get_early_epoch)
-  point = get_important_point(import_val, percentile)
+  point = get_raw_important_point(import_val, percentile)
   draw_important_point(to_explain, point)
   return shap_val, grads_temp, point
